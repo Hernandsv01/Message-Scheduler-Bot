@@ -1,0 +1,27 @@
+{
+    "prefix": ";",
+    "messageList": [
+        {
+            "message_name": "testcommand",
+            "message_content": "Cambiando contenido",
+            "dates": [
+                {
+                    "day": "FRIDAY",
+                    "hour": "12",
+                    "minute": "00"
+                }
+            ]
+        },
+        {
+            "message_name": "nombre_test",
+            "message_content": "Hola",
+            "dates": [
+                {
+                    "day": "friday",
+                    "hour": "12",
+                    "minute": "00"
+                }
+            ]
+        }
+    ]
+}
