@@ -1,13 +1,53 @@
 const Discord = require("discord.js");
 const config = require("./config.json");
+const cron = require("cron");
 const fs = require("fs");
-const { triggerAsyncId } = require("async_hooks");
+let settings = obtenerSettings();
+let channel;
 
 const client = new Discord.Client();
+client.login(config.BOT_TOKEN);
 
 require("./ExtendedMessage");
 
-client.login(config.BOT_TOKEN);
+/* new cron.cronJob(minute, hour, monthDay, month, weekday); */
+/* client.channels.cache.find(channel => channel.name === "bot-tests"); */
+
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const COMMANDS = ["help", "prefix", "createscheduledmessage", "showmessageinfo", "changemessagecontent", "removescheduledmessage", "addnewdate", "removedate", "showallmessages", "test"];
+const SC_COMMANDS = ["", "", "csm", "smi", "cmc", "rsm", "and", "rd", "sam", ""];
+const EMOJIS = {
+    e100: "<:100:911514881818251294>",
+    confirmation: "<:white_check_mark:911516809394528307>",
+    error: "<:bangbang:911663442128150601>",
+    information: "<:blue_circle:912041543693643817>"
+}
+
+let helpMessage = "Commands: \n"
+                +" - help </command>\n"
+                +" - prefix <prefix>\n"
+                +" - createscheduledmessage (csm) <message_name> <message>\n"
+                +" - showmessageinfo (smi) <message_name>\n"
+                +" - changemessagecontent (cmc) <message_name> <new_message_content>\n"
+                +" - removescheduledmessage (rsm) <message_name>\n"
+                +" - addnewdate (and) <message_name> <day> <hour> </minute>\n"
+                +" - removedate (rd) <message_name> <day> <hour> </minute>\n"
+                +" - showmessages (sam) <message_name> <day> <hour> </minute>\n"
+
+/*
+ * Comandos
+ *  0. help
+ *  1. prefix <prefix>
+ * 
+ *  2. createscheduledmessage <message_name> <message> 
+ *  3. showmessageinfo <message_name>
+ *  4. changemessagecontent <message_name> <new_message_content>
+ *  5. removescheduledmessage <message_name>
+ * 
+ *  6. addnewdate <message_name> <day> <hour> <*minute>
+ *  7. removedate <message_name> <day> <hour> <*minute>
+ *  8. showallmessages
+ */
 
 /* -------------------------------------------------------------------------- */
 /*                       Funciones y estructuras utiles                       */
@@ -18,13 +58,30 @@ function obtenerSettings(){
 function guardarSettings(objeto){
     fs.writeFileSync("./settings.json", JSON.stringify(objeto));
 }
-function normalizeMessageInfo(message_name, message_content){
-    let message_obj = {
-        message_name: message_name,
-        message_content: message_content,
+
+function createAndStartJob(message, channel, date){
+    let crontime = `${date.minute} ${date.hour} * * ${WEEKDAYS.indexOf(date.day)}`;
+    let job = new cron.CronJob(crontime, ()=>{
+        channel.send(message);
+    });
+    job.start();
+}
+function startJobs(messageList){
+    messageList.forEach(e => {
+        e.dates.forEach(element => {
+            createAndStartJob(e.content, e.channel, element);
+        });
+    });
+}
+
+function normalizeMessageInfo(name, channel, content){
+    let obj = {
+        name: name,
+        channel: channel,
+        content: content,
         dates: []
     }
-    return message_obj;
+    return obj;
 }
 function normalizeDate(day, hour, minute){
     let date = {
@@ -60,14 +117,9 @@ function validMinute(minute){
 }
 
 function dateExists(dateList, dateObj){
-    let found = dateList.find((e)=>{
+    return dateList.find((e)=>{
         return (e.day === dateObj.day) && (e.hour === dateObj.hour) && (e.minute === dateObj.minute);
     });
-    if(found === undefined){
-        return false;
-    }else{
-        return true;
-    }
 }
 
 function successMessage(action){
@@ -86,17 +138,14 @@ function errorMessage(action){
     };
     return {embed};
 }
-
-const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-const COMMANDS = ["help", "prefix", "createscheduledmessage", "showmessagecontent", "changemessagecontent", "removescheduledmessage", "addnewdate", "removedate", "test"];
-const EMOJIS = {
-    e100: "<:100:911514881818251294>",
-    confirmation: "<:white_check_mark:911516809394528307>",
-    error: "<:bangbang:911663442128150601>"
+function informativeMessage(action){
+    const embed = {
+        "description": action,
+        "url": "https://discordapp.com",
+        "color": 4886754
+    };
+    return {embed};
 }
-
-let helpMessage = "Commands: \n"
-                 +"    help";
 
 /**
  * Comandos
@@ -104,7 +153,7 @@ let helpMessage = "Commands: \n"
  *  1. prefix <prefix>
  * 
  *  2. createscheduledmessage <message_name> <message> 
- *  3. showmessagecontent <message_name>
+ *  3. showmessageinfo <message_name>
  *  4. changemessagecontent <message_name> <new_message_content>
  *  5. removescheduledmessage <message_name>
  * 
@@ -114,10 +163,12 @@ let helpMessage = "Commands: \n"
 
 client.on("ready", function(){
     console.log("The client is ready");
-    
+    channel = client.channels.cache.find(channel => channel.name === "bot-tests");
+    startJobs(settings.messageList);
 });
 client.on("message", function(message){
-    let settings = obtenerSettings();
+    settings = obtenerSettings();
+    channel = message.channel;
 
     if(message.author.bot) return;
     if(!message.content.startsWith(settings.prefix)) return;
@@ -130,7 +181,7 @@ client.on("message", function(message){
     });
     const command = args.shift().toLowerCase();
 
-    if(!COMMANDS.includes(command)) return;
+    if(!COMMANDS.includes(command) && !SC_COMMANDS.includes(command)) return;
 
     /* -------------------------------------------------------------------------- */
     /*                                   Actions                                  */
@@ -138,93 +189,98 @@ client.on("message", function(message){
 
     /* ------------------------------ help command ------------------------------ */
     if(command === COMMANDS[0]){
-        message.channel.send(helpMessage);
+        message.channel.send(informativeMessage(helpMessage));
 
     /* ----------------------------- prefix command ----------------------------- */
     }else if(command === COMMANDS[1]){
         if(args.length !== 1){
-            message.channel.send("Wrong number of arguments for command: " + command);
+            message.channel.send(errorMessage("Wrong number of arguments for command: " + command));
         }else if(args[0].length !== 1){
-            message.channel.send("Prefix must be a single character");
+            message.channel.send(errorMessage("Prefix must be a single character"));
         }else{
             settings.prefix = args[0].toLowerCase();
-            message.channel.send("New prefix set: " + settings.prefix);
+            message.channel.send(successMessage("New prefix set: " + settings.prefix));
             guardarSettings(settings);
         }
     
     /* --------------------- createscheduledmessage command --------------------- */
-    }else if(command === COMMANDS[2]){
+    }else if(command === COMMANDS[2] || command === SC_COMMANDS[2]){
         if(args.length < 2){
-            message.channel.send("Wrong number of arguments for command: " + command);
+            message.channel.send(errorMessage("Wrong number of arguments for command: " + command));
             return;
         }
 
         let message_name = args.shift().toLowerCase();
         let encontrado = settings.messageList.find(element => {
-            return element.message_name === message_name;
+            return element.name === message_name;
         });
         if(encontrado !== undefined){
-            message.channel.send("This message already exists");
+            message.channel.send(errorMessage("This message already exists"));
             return;
         }
         
         let messageStr = args.join(" ");
 
-        let messageObj = normalizeMessageInfo(message_name, messageStr);
+        let messageObj = normalizeMessageInfo(message_name, message.channel, messageStr);
         settings.messageList.push(messageObj);
         guardarSettings(settings);
 
-        let confirmationMessage = "Scheduled message created: \n"
-                                + "     Message name: " + messageObj.message_name + "\n"
-                                + "     Message content: " + messageObj.message;
+        let confirmationMessage = successMessage("Scheduled message created: \n"
+                                + "     Message name: " + messageObj.name + "\n"
+                                + "     Message content: " + messageObj.content);
         message.channel.send(confirmationMessage);
     
-    /* ------------------------ showmessagecontent command ----------------------- */
-    }	else if(command === COMMANDS[3]){
+    /* ------------------------- showmessageinfo command ------------------------ */
+    }	else if(command === COMMANDS[3] || command === SC_COMMANDS[3]){
         if(args.length > 1){
-            message.channel.send("Too many arguments for command: " + command);
+            message.channel.send(errorMessage("Too many arguments for command: " + command));
             return;
         }
 
         let messageInfo = settings.messageList.find(function(element){
-            return args[0] === element.message_name;
+            return args[0] === element.name;
         });
         if(messageInfo === undefined){
-            message.channel.send("That message doesn't exist");
+            message.channel.send(errorMessage("That message doesn't exist"));
             return;
         }
 
-        message.inlineReply("Message: " + messageInfo.message_content)
+        let fullMessage = "**Message**: " + messageInfo.content + "\n**Dates:**";
+        messageInfo.dates.forEach(element => {
+            let minutes = element.minute<10?"0"+element.minute:element.minute;
+            fullMessage += "\n - " + element.day[0].toUpperCase()+element.day.slice(1, element.day.length) + " at " + element.hour + ":" + minutes;
+        });
+        message.inlineReply(informativeMessage(fullMessage));
         
     /* ---------------------- changemessagecontent command ---------------------- */
-    }else if(command === COMMANDS[4]){
+    }else if(command === COMMANDS[4] || command === SC_COMMANDS[4]){
         if(args.length < 2){
-            message.channel.send("Wrong number of arguments for command: " + command);
+            message.channel.send(errorMessage("Wrong number of arguments for command: " + command));
             return;
         }
 
         let messageStr = args.slice(1, args.length).join(" ");
 
-        let index = settings.messageList.map(e => e.message_name).indexOf(args[0]);
+        let index = settings.messageList.map(e => e.name).indexOf(args[0]);
 
         if(index === -1){
-            message.channel.send("That message doesn't exist");
+            message.channel.send(errorMessage("That message doesn't exist"));
             return;
         }
 
-        settings.messageList[index].message_content = messageStr;
+        settings.messageList[index].content = messageStr;
         guardarSettings(settings);
-        message.channel.send("Message " + args[0] + " updated successfuly");
+        message.channel.send(successMessage("Message " + args[0] + " updated successfuly"));
 
     /* --------------------- removescheduledmessage command --------------------- */
-    }else if(command === COMMANDS[5]){
+    }else if(command === COMMANDS[5] || command === SC_COMMANDS[5]){
         if(args.length > 1){
-            message.channel.send("Wrong number of arguments for command: " + command);
+            message.channel.send(errorMessage("Wrong number of arguments for command: " + command));
             return;
         }
-        let index = settings.messageList.map(e => e.message_name).indexOf(args[0]);
+        let index = settings.messageList.map(e => e.name).indexOf(args[0]);
         if(index === -1){
-            message.channel.send("That message doesn't exist");
+            message.channel.send(errorMessage("That message doesn't exist"));
             return;
         }
 
@@ -233,12 +289,12 @@ client.on("message", function(message){
         message.channel.send(successMessage("Message " + args[0] + " deleted successfuly"));
 
     /* --------------------------- addnewdate command --------------------------- */
-    }else if(command === COMMANDS[6]){
+    }else if(command === COMMANDS[6] || command === SC_COMMANDS[6]){
         if(args.length !== 3 && args.length !== 4){
             message.channel.send(errorMessage("Wrong number of arguments for command **" + command + "**\n See **help** for more information on how to use it"));
             return;
         }
-        let index = settings.messageList.map(e => e.message_name).indexOf(args[0]);
+        let index = settings.messageList.map(e => e.name).indexOf(args[0]);
         if(index === -1){
             message.channel.send(errorMessage("That message doesn't exist"));
             return;
@@ -248,22 +304,45 @@ client.on("message", function(message){
             return;
         }
         let dateObj = normalizeDate(args[1], args[2], args[3]);
-        if(dateExists(settings.messageList[index].dates, dateObj)){
+        if(dateExists(settings.messageList[index].dates, dateObj) !== undefined){
             message.channel.send(errorMessage("That date is already registered in this message"));
             return;
         }
 
         settings.messageList[index].dates.push(dateObj);
         guardarSettings(settings);
+        createAndStartJob(settings.messageList[index].content, message.channel, dateObj);
         message.channel.send(successMessage("Date added successfuly"));
 
 
     /* --------------------------- removedate command --------------------------- */
-    }else if(command === COMMANDS[7]){
+    }else if(command === COMMANDS[7] || command === SC_COMMANDS[7]){
+        if(args.length !== 3 && args.length !== 4){
+            message.channel.send(errorMessage("Wrong number of arguments for command: " + command));
+            return;
+        }
+        let index = settings.messageList.map(e => e.name).indexOf(args[0]);
+        if(index === -1){
+            message.channel.send(errorMessage("That message doesn't exist"));
+            return;
+        }
+        let dateObj = normalizeDate(args[1], args[2], args[3]);
+        let dateIndex = dateExists(settings.messageList[index].dates, dateObj);
+        if(dateIndex === undefined){
+            message.channel.send(errorMessage("That date for that message doesn't exist"));
+            return;
+        }
 
+        settings.messageList[index].dates.splice(dateIndex, 1);
+        guardarSettings(settings);
+        message.channel.send(successMessage("Date for message " + args[0] + " deleted successfully"));
 
-    }else if(command === COMMANDS[8]){
-        message.channel.send(successMessage("Message updated successfully"));
-        message.channel.send(errorMessage("Wrong number of arguments"));
+    /* ------------------------------ showmessages ------------------------------ */
+    }else if(command === COMMANDS[8] || command === SC_COMMANDS[8]){
+        let fullMessage = "List of messages: \n";
+        settings.messageList.forEach(element => {
+            fullMessage += " - " + element.name + ": " + element.content + "\n"
+        });
+        message.channel.send(informativeMessage(fullMessage));
     }
 });
