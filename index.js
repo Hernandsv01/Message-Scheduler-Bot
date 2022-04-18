@@ -5,6 +5,8 @@ const fs = require("fs");
 let settings = obtenerSettings();
 let channel;
 
+/* Un bot no puede llamar a otro bot */
+
 const client = new Discord.Client();
 client.login(config.BOT_TOKEN);
 
