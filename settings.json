@@ -277,6 +277,47 @@
                     "minute": "58"
                 }
             ]
+        },
+        {
+            "name": "wtfix",
+            "channel": {
+                "type": "text",
+                "deleted": false,
+                "id": "876241237080936483",
+                "name": "general",
+                "rawPosition": 0,
+                "parentID": "876241237080936480",
+                "permissionOverwrites": [
+                    "876241236573446176",
+                    "881018360517771304"
+                ],
+                "topic": null,
+                "lastMessageID": "967322056662339674",
+                "rateLimitPerUser": 0,
+                "lastPinTimestamp": 1637391862000,
+                "guild": "876241236573446176",
+                "messages": [
+                    "967321096066072617",
+                    "967321096628076624",
+                    "967321178303774760",
+                    "967322056662339674"
+                ],
+                "nsfw": false,
+                "createdTimestamp": 1628982590695
+            },
+            "content": "/wtfix",
+            "dates": [
+                {
+                    "day": "saturday",
+                    "hour": "04",
+                    "minute": "15"
+                },
+                {
+                    "day": "saturday",
+                    "hour": "04",
+                    "minute": "17"
+                }
+            ]
         }
     ]
 }
